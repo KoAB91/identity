@@ -23,7 +23,7 @@ public class ClientExample {
             request.setCreationTime(LocalDateTime.now());
             request.setRequestStatus(RequestStatus.CREATED);
             request.setClientId((int) (Math.random()*1000) + 1);
-            request.setLeadTime(60);
+            request.setLeadTime((int) (Math.random()*100)+30);
             requestDao.add(request);
         }
     }

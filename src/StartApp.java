@@ -3,7 +3,7 @@ import server.HttpServer;
 
 
 
-public class Main {
+public class StartApp {
     public static void main(String[] args) {
 
         new Thread(new HttpServer()).start();

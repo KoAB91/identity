@@ -6,16 +6,17 @@ import dao.OperatorDao;
 import dao.RequestDao;
 import entity.*;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class Distributor extends Thread{
+public class Distributor extends Thread {
 
-    static ExecutorService executeIt = Executors.newFixedThreadPool(16);
-    private static long timeToProccesingByOperator = 40;
-    private static long timeToProccesingByManager = 60;
+    static ExecutorService executeIt = Executors.newCachedThreadPool();
+    private static long timeToProccesingByOperator = 60;
+    private static long timeToProccesingByManager = 100;
 
     @Override
     public void run() {
@@ -23,29 +24,12 @@ public class Distributor extends Thread{
     }
 
     public static void distribute() {
+        System.out.println("Distrib started");
 
-        // получаем соединения с таблицами
         RequestDao requestDao = RequestDao.getInstance();
-//        requestDao.createTable();
         OperatorDao operatorDao = OperatorDao.getInstance();
-//        operatorDao.createTable();
-//        for (int i = 1; i <= 10; i++){
-//            Operator operator = new Operator();
-//            operator.setName("Operator " + i);
-//            operatorDao.add(operator);
-//        }
         ManagerDao managerDao = ManagerDao.getInstance();
-//        managerDao.createTable();
-//        for (int i = 1; i <= 5; i++){
-//            Manager manager = new Manager();
-//            manager.setName("Manager " + i);
-//            managerDao.add(manager);
-//        }
         DirectorDao directorDao = DirectorDao.getInstance();
-//        directorDao.createTable();
-//        Director director1 = new Director();
-//        director1.setName("Director");
-//        directorDao.add(director1);
 
         List<Operator> operators = null;
         List<Manager> managers = null;
@@ -56,6 +40,11 @@ public class Distributor extends Thread{
         while (true) {
             requests = requestDao.getAllByStatus(RequestStatus.CREATED);
             if (requests.size() == 0) {
+                try {
+                    Thread.sleep(15000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
                 continue;
             }
             operators = operatorDao.getNotWorking();
@@ -65,11 +54,23 @@ public class Distributor extends Thread{
                         Request request = requests.get(0);
                         executeIt.execute(new OperatorHandler(requestDao, operatorDao, operator, request));
                         requests.remove(0);
-                    } else continue main;
+                    } else {
+                        try {
+                            Thread.sleep(15000);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        continue main;
+                    }
                 }
             }
             if (!requests.isEmpty()) {
-                if (!requests.get(0).getCreationTime().plusSeconds(timeToProccesingByOperator).isAfter(LocalDateTime.now())) {
+                if (Duration.between(requests.get(0).getCreationTime(), LocalDateTime.now()).getSeconds() < timeToProccesingByOperator) {
+                    try {
+                        Thread.sleep(15000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                     continue;
                 } else {
                     managers = managerDao.getNotWorking();
@@ -79,19 +80,30 @@ public class Distributor extends Thread{
                                 Request request = requests.get(0);
                                 executeIt.execute(new ManagerHandler(requestDao, managerDao, manager, request));
                                 requests.remove(0);
-                            } else continue main;
+                            } else {
+                                try {
+                                    Thread.sleep(15000);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                                continue main;
+                            }
                         }
                     }
                 }
             } else continue;
             if (!requests.isEmpty()) {
-                if (!requests.get(0).getCreationTime().plusSeconds(timeToProccesingByManager).isAfter(LocalDateTime.now())) {
+                if (Duration.between(requests.get(0).getCreationTime(), LocalDateTime.now()).getSeconds() < timeToProccesingByManager) {
+                    try {
+                        Thread.sleep(15000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                     continue;
                 } else {
                     director = directorDao.getNotBusy();
                     if (director != null) {
                         Request request = requests.get(0);
-                        System.out.println("Заявка с индексом 0 = " + request.getId() + " идет к директору");
                         executeIt.execute(new DirectorHandler(requestDao, directorDao, director, request));
                         requests.remove(0);
                     }
@@ -125,10 +137,10 @@ class OperatorHandler implements Runnable {
     public void run() {
         operatorDao.update(operator.getId(), request.getId());
         requestDao.update(request.getId(), RequestStatus.IN_PROCESSING);
-        System.out.println("Статус заявки " + request.getId() + " измененен на PROCESSING");
+//        System.out.println("Статус заявки " + request.getId() + " измененен на PROCESSING");
         request.setStartProcTime(LocalDateTime.now());
         requestDao.setEmployee(request.getId(), operator.getName());
-        System.out.println("Оператор " + operator.getId() + " взял заявку " + request.getId());
+//        System.out.println("Оператор " + operator.getId() + " взял заявку " + request.getId());
         try {
             Thread.sleep(request.getLeadTime() * 1000);
         } catch (InterruptedException e) {
@@ -136,7 +148,7 @@ class OperatorHandler implements Runnable {
         }
         operatorDao.update(operator.getId(), 0);
         requestDao.update(request.getId(), RequestStatus.DONE);
-        System.out.println("Статус заявки " + request.getId() + " измененен на DONE");
+//        System.out.println("Статус заявки " + request.getId() + " измененен на DONE");
     }
 }
 
@@ -158,10 +170,10 @@ class ManagerHandler implements Runnable {
     public void run() {
         managerDao.update(manager.getId(), request.getId());
         requestDao.update(request.getId(), RequestStatus.IN_PROCESSING);
-        System.out.println("Статус заявки " + request.getId() + " измененен на PROCESSING");
+//        System.out.println("Статус заявки " + request.getId() + " измененен на PROCESSING");
         request.setStartProcTime(LocalDateTime.now());
         requestDao.setEmployee(request.getId(), manager.getName());
-        System.out.println("Менеджер " + manager.getId() + " взял заявку");
+//        System.out.println("Менеджер " + manager.getId() + " взял заявку");
         try {
             Thread.sleep(request.getLeadTime() * 1000);
         } catch (InterruptedException e) {
@@ -169,7 +181,7 @@ class ManagerHandler implements Runnable {
         }
         managerDao.update(manager.getId(), 0);
         requestDao.update(request.getId(), RequestStatus.DONE);
-        System.out.println("Статус заявки " + request.getId() + " измененен на DONE");
+//        System.out.println("Статус заявки " + request.getId() + " измененен на DONE");
     }
 }
 
@@ -191,9 +203,9 @@ class DirectorHandler implements Runnable {
     public void run() {
         directorDao.update(director.getId(), request.getId());
         requestDao.update(request.getId(), RequestStatus.IN_PROCESSING);
-        System.out.println("Статус заявки " + request.getId() + " измененен на PROCESSING");
+//        System.out.println("Статус заявки " + request.getId() + " измененен на PROCESSING");
         requestDao.setEmployee(request.getId(), director.getName());
-        System.out.println("Директор взял заявку");
+//        System.out.println("Директор взял заявку");
         try {
             Thread.sleep(request.getLeadTime() * 1000);
         } catch (InterruptedException e) {
@@ -201,7 +213,7 @@ class DirectorHandler implements Runnable {
         }
         directorDao.update(director.getId(), 0);
         requestDao.update(request.getId(), RequestStatus.DONE);
-        System.out.println("Статус заявки " + request.getId() + " измененен на DONE");
+//        System.out.println("Статус заявки " + request.getId() + " измененен на DONE");
     }
 }
 

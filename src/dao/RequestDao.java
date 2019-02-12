@@ -61,7 +61,7 @@ public class RequestDao implements IDao<Request> {
         String sql = "INSERT INTO Request (clientId, creationTime, leadTime, status)" + "VALUES (?, ?, ?, ?);";
         try (PreparedStatement statement = this.connection.prepareStatement(sql)) {
             statement.setInt(1, request.getClientId());
-            statement.setTimestamp(2, Timestamp.valueOf(request.getCreationTime().plusHours(3)));
+            statement.setTimestamp(2, Timestamp.valueOf(request.getCreationTime()));
             statement.setInt(3, request.getLeadTime());
             statement.setString(4, request.getRequestStatus().name());
             statement.executeUpdate();

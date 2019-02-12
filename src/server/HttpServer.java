@@ -25,6 +25,7 @@ public class HttpServer extends Thread {
     public static void startServer() {
         try {
             ServerSocket socket = new ServerSocket(8010);
+            System.out.println("server started");
             while (true) {
                 Socket client = socket.accept();
                 System.err.println("Client accepted");
@@ -108,17 +109,17 @@ public class HttpServer extends Thread {
 
             JSONObject json = new JSONObject();
 
-            json.put("waitingCount", waitingRequests.size()).put("pendingCount", pendingRequests.size());
+            json.accumulate("waitingCount", waitingRequests.size()).accumulate("pendingCount", pendingRequests.size());
 
             JSONArray apllications = new JSONArray();
 
             for (Request request : doneRequests) {
                 JSONObject apllication = new JSONObject();
-                apllication.put("", new JSONObject().put("id", request.getId())
-                        .put("perfomedBy", request.getEmployee())
-                        .put("endDate", request.getEndTime().toString())
-                        .put("expectedTime", request.getLeadTime())
-                        .put("takenTime", (Duration.between(request.getCreationTime(), request.getEndTime()).getSeconds())));
+                apllication.accumulate("id", request.getId())
+                        .accumulate("perfomedBy", request.getEmployee())
+                        .accumulate("endDate", request.getEndTime().toString())
+                        .accumulate("expectedTime", request.getLeadTime())
+                        .accumulate("takenTime", (Duration.between(request.getCreationTime(), request.getEndTime()).getSeconds()));
                 apllications.put(apllication);
             }
             json.put("apllications", apllications);
@@ -127,34 +128,34 @@ public class HttpServer extends Thread {
 
         private void getEmployees() {
             List<Operator> operators = OperatorDao.getInstance().getAll();
+            JSONArray jsonArray = new JSONArray();
             JSONObject json = new JSONObject();
             for (Operator operator : operators) {
-                json.put("", new JSONObject()
-                        .put("id", operator.getId())
-                        .put("name", operator.getName())
-                        .put("applicationId", operator.getRequestId())
-                        .put("role", operator.getRole().toString().toLowerCase()).toString());
+                jsonArray.put(new JSONObject()
+                        .accumulate("id", operator.getId())
+                        .accumulate("name", operator.getName())
+                        .accumulate("applicationId", operator.getRequestId())
+                        .accumulate("role", operator.getRole().toString().toLowerCase()));
             }
 
             List<Manager> managers = ManagerDao.getInstance().getAll();
             for (Manager manager : managers) {
-                json.put("", new JSONObject()
-                        .put("id", manager.getId())
-                        .put("name", manager.getName())
-                        .put("applicationId", manager.getRequestId())
-                        .put("role", manager.getRole().toString().toLowerCase()).toString());
+                jsonArray.put(new JSONObject()
+                        .accumulate("id", manager.getId())
+                        .accumulate("name", manager.getName())
+                        .accumulate("applicationId", manager.getRequestId())
+                        .accumulate("role", manager.getRole().toString().toLowerCase()));
             }
 
             List<Director> directors = DirectorDao.getInstance().getAll();
             for (Director director : directors) {
-                json.put("", new JSONObject()
-                        .put("id", director.getId())
-                        .put("name", director.getName())
-                        .put("applicationId", director.getRequestId())
-                        .put("role", director.getRole().toString().toLowerCase()).toString());
+                jsonArray.put(new JSONObject()
+                        .accumulate("id", director.getId())
+                        .accumulate("name", director.getName())
+                        .accumulate("applicationId", director.getRequestId())
+                        .accumulate("role", director.getRole().toString().toLowerCase()));
             }
-
-            writeResponse(json.toString());
+            writeResponse(jsonArray.toString());
         }
 
     }
