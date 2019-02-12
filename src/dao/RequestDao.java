@@ -168,7 +168,7 @@ public class RequestDao implements IDao<Request> {
             try (PreparedStatement statement = this.connection.prepareStatement(sql)) {
                 statement.setString(1, status.toString());
                 statement.setInt(3, id);
-                statement.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now().plusHours(3)));
+                statement.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
                 statement.executeUpdate();
             } catch (SQLException e) {
                 e.printStackTrace();

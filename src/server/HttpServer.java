@@ -51,50 +51,94 @@ public class HttpServer extends Thread {
         public void run() {
             try {
                 readInputHeaders();
-//                writeResponse("<html><body><h1>Welcome to Identity!</h1></body></html>");
             } catch (Throwable t) {
-//            } finally {
-//                try {
-//                    s.close();
-//                } catch (Throwable t) {
-//                }
             }
             System.err.println("Client processing finished");
         }
 
 
-        private void readInputHeaders() throws Throwable {
-            BufferedReader br = new BufferedReader(new InputStreamReader(is));
-            while (true) {
-                String line = br.readLine();
-                if (line == null || line.trim().length() == 0) {
-                    break;
-                }
-                System.out.println(line);
+        private void readInputHeaders() {
+            try (InputStreamReader ss = new InputStreamReader(is);
+                 BufferedReader br = new BufferedReader(ss)) {
 
-                if (line.contains("application-history")) {
-                    getApplicationHistory();
+                StringBuilder request = new StringBuilder();
+
+                while (true) {
+                    String line = br.readLine();
+                    if (line.isBlank()) {
+                        break;
+                    }
+                    request.append(line).append("\r\n");
                 }
-                if (line.contains("employees")) {
+
+                System.out.println("Request accepted");
+                System.out.println(request);
+
+                if (request.toString().contains("OPTIONS")) {
+                    writeOptionsResponse();
+                } else if (request.toString().contains("application-history")) {
+                    if (request.toString().contains("POST")) {
+                        String[] numbOfSigns = request.toString().split(" ");
+                        int number = 0;
+                        for (int i = 0; i < numbOfSigns.length; i++){
+                            if (numbOfSigns[i].contains("Content-Length")){
+                                number = Integer.parseInt(numbOfSigns[i+1].replaceAll("[^0-9]", ""));
+                                break;
+                            }
+                        }
+                        StringBuilder params = new StringBuilder();
+                        for(int i = 0; i < number; i++){
+                            params.append((char) br.read());
+                        }
+                        String[] appValue = params.toString().split(":");
+                        int count = 0;
+                        for (int i = 0; i < appValue.length; i++){
+                            if (appValue[i].contains("count")){
+                                count = Integer.parseInt(appValue[i+1].replaceAll("[^0-9]", ""));
+                                break;
+                            }
+                        }
+                        ClientExample.createApplications(count);
+                    } else {
+                        getApplicationHistory();
+                    }
+                } else if (request.toString().contains("employees")) {
                     getEmployees();
                 }
-                if (line.contains("create-applications")){
-                    int i = 2;
-                    ClientExample.createApplications(i);
-                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
             }
         }
 
         private void writeResponse(String s) {
             String response = "HTTP/1.1 200 OK\r\n" +
                     "Server: IdentityServer/2019-02-11\r\n" +
-                    "Content-Type: text/html\r\n" +
+                    "Access-Control-Allow-Origin: *\r\n" +
+                    "Content-Type: application/json\r\n" +
                     "Content-Length: " + s.length() + "\r\n" +
                     "Connection: close\r\n\r\n";
             String result = response + s;
             try {
-                os.write(result.getBytes());
-                os.flush();
+                OutputStreamWriter out = new OutputStreamWriter(os);
+                out.write(result);
+                out.flush();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void writeOptionsResponse() {
+            String response = "HTTP/1.1 200 OK\r\n" +
+                    "Server: IdentityServer/2019-02-11\r\n" +
+                    "Access-Control-Allow-Headers: *\r\n" +
+                    "Access-Control-Allow-Origin: *\r\n" +
+                    "Access-Control-Allow-Methods: OPTIONS, GET, PUT, POST, DELETE\r\n" +
+                    "Content-Length: 0\r\n" +
+                    "Connection: close\r\n\r\n";
+            try {
+                OutputStreamWriter out = new OutputStreamWriter(os);
+                out.write(response);
+                out.flush();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -111,48 +155,51 @@ public class HttpServer extends Thread {
 
             json.accumulate("waitingCount", waitingRequests.size()).accumulate("pendingCount", pendingRequests.size());
 
-            JSONArray apllications = new JSONArray();
+            JSONArray applications = new JSONArray();
 
             for (Request request : doneRequests) {
-                JSONObject apllication = new JSONObject();
-                apllication.accumulate("id", request.getId())
-                        .accumulate("perfomedBy", request.getEmployee())
+                JSONObject application = new JSONObject();
+                application.accumulate("id", request.getId())
+                        .accumulate("performedBy", request.getEmployee())
                         .accumulate("endDate", request.getEndTime().toString())
                         .accumulate("expectedTime", request.getLeadTime())
                         .accumulate("takenTime", (Duration.between(request.getCreationTime(), request.getEndTime()).getSeconds()));
-                apllications.put(apllication);
+                applications.put(application);
             }
-            json.put("apllications", apllications);
+            json.put("applications", applications);
             writeResponse(json.toString());
         }
 
         private void getEmployees() {
             List<Operator> operators = OperatorDao.getInstance().getAll();
             JSONArray jsonArray = new JSONArray();
-            JSONObject json = new JSONObject();
+            int requestId;
             for (Operator operator : operators) {
+                requestId = operator.getRequestId();
                 jsonArray.put(new JSONObject()
                         .accumulate("id", operator.getId())
                         .accumulate("name", operator.getName())
-                        .accumulate("applicationId", operator.getRequestId())
+                        .accumulate("applicationId", requestId == 0 ? null : requestId)
                         .accumulate("role", operator.getRole().toString().toLowerCase()));
             }
 
             List<Manager> managers = ManagerDao.getInstance().getAll();
             for (Manager manager : managers) {
+                requestId = manager.getRequestId();
                 jsonArray.put(new JSONObject()
                         .accumulate("id", manager.getId())
                         .accumulate("name", manager.getName())
-                        .accumulate("applicationId", manager.getRequestId())
+                        .accumulate("applicationId", requestId == 0 ? null : requestId)
                         .accumulate("role", manager.getRole().toString().toLowerCase()));
             }
 
             List<Director> directors = DirectorDao.getInstance().getAll();
             for (Director director : directors) {
+                requestId = director.getRequestId();
                 jsonArray.put(new JSONObject()
                         .accumulate("id", director.getId())
                         .accumulate("name", director.getName())
-                        .accumulate("applicationId", director.getRequestId())
+                        .accumulate("applicationId", requestId == 0 ? null : requestId)
                         .accumulate("role", director.getRole().toString().toLowerCase()));
             }
             writeResponse(jsonArray.toString());

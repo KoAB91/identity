@@ -5,7 +5,6 @@ import dao.ManagerDao;
 import dao.OperatorDao;
 import dao.RequestDao;
 import entity.*;
-
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;

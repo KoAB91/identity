@@ -18,6 +18,7 @@ public class ClientExample {
     public static void createApplications(int count) {
 
         RequestDao requestDao = RequestDao.getInstance();
+        requestDao.createTable();
         for (int i = 1; i <= count; i++){
             Request request = new Request();
             request.setCreationTime(LocalDateTime.now());
